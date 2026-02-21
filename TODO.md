@@ -52,3 +52,26 @@ Reference: [day02.md](./day02.md)
 - Call APIs sequentially: geocoding first to get lat/lng, then forecast
 - All JSON responses (including errors) must use `Content-Type: application/json`
 - External APIs: Open-Meteo (no API key required)
+
+---
+
+# TODO - Day 03: Geocoding Cache
+
+Reference: [log/day03.md](./log/day03.md)
+
+## Phase 1: Implementation
+
+- [x] **D3-1.1** Create `src/cache/location.js` — module that reads/writes `location.json`; exports `get(city)` and `set(city, data)` with lowercase-normalized keys
+- [x] **D3-1.2** Update `src/handlers/weather.js` — check cache before Geocoding API call; write to cache on successful geocoding response
+
+## Phase 2: Verification
+
+- [x] **D3-2.1** Start server, `GET /weather?city=Tokyo` — expect 200 JSON; confirm `location.json` created with `"tokyo"` entry
+- [x] **D3-2.2** Second `GET /weather?city=Tokyo` — expect 200 JSON served from cache (Geocoding API not called)
+- [x] **D3-2.3** `GET /weather?city=tokyo` (lowercase) — expect 200 JSON cache hit
+- [x] **D3-2.4** `GET /weather?city=Nonexistentplace12345` — expect 404; confirm `location.json` unchanged
+- [x] **D3-2.5** Confirm `GET /hello` still returns 200 `hello world!`
+
+## Future Tasks (not scheduled)
+
+- [ ] **D3-Future** Add capability to compare cached location against live Geocoding API result and flag/update on coordinate mismatch

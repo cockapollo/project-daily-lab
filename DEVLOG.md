@@ -117,3 +117,77 @@ D2-2.5: GET /hello                    → 200 hello world!  (regression pass)
 ## Status
 
 Complete. All Day 02 acceptance criteria verified.
+
+---
+
+# Development Log - Day 03: Geocoding Cache
+
+**Date:** 2026-02-21
+
+## Session Summary
+
+Planned local file-based caching of geocoding results to `location.json`. Reorganized spec files into the `log/` directory, created the Day 03 specification, and updated the task list.
+
+## Steps Performed
+
+### 1. Reorganized Spec Files
+
+- Created `log/` directory
+- Moved `day01.md` and `day02.md` into `log/`
+
+### 2. Created Specification (`log/day03.md`)
+
+- Defined cache file format: `location.json` at project root, keyed by lowercase city name
+- Defined new module `src/cache/location.js` with `get`/`set` API
+- Specified cache lookup/write behavior in `weather.js` (Geocoding API bypassed on cache hit)
+- Added future task: verify cached coordinates against live Geocoding API result
+
+### 3. Updated Task List (`TODO.md`)
+
+- Added Day 03 implementation and verification tasks
+- Added `D3-Future` entry for cache validation capability
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/` | Created | Directory for spec files |
+| `log/day01.md` | Moved | Day 01 spec (was `day01.md`) |
+| `log/day02.md` | Moved | Day 02 spec (was `day02.md`) |
+| `log/day03.md` | Created | Geocoding cache specification |
+| `TODO.md` | Updated | Added Day 03 tasks and future task entry |
+| `DEVLOG.md` | Updated | Added Day 03 session log |
+
+## Implementation Notes
+
+- Initial server test showed `location.json` not being written; root cause was a stale server process from a previous session still holding port 3000. Subsequent clean run (with explicit port kill) confirmed correct behavior.
+
+## Verification Results
+
+All 5 acceptance criteria passed:
+
+```
+D3-2.1: GET /weather?city=Tokyo       → 200 JSON; location.json created with "tokyo" entry
+D3-2.2: GET /weather?city=Tokyo       → 200 JSON from cache (geocoding API not called)
+D3-2.3: GET /weather?city=tokyo       → 200 JSON cache hit (lowercase key match)
+D3-2.4: GET /weather?city=Nonexist... → 404 {"error":"City not found: ..."}; location.json unchanged
+D3-2.5: GET /hello                    → 200 hello world!  (regression pass)
+```
+
+## Files Created / Modified (Final)
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/` | Created | Directory for spec files |
+| `log/day01.md` | Moved | Day 01 spec (was `day01.md`) |
+| `log/day02.md` | Moved | Day 02 spec (was `day02.md`) |
+| `log/day03.md` | Created | Geocoding cache specification |
+| `src/cache/location.js` | Created | Cache module — `get`/`set` backed by `location.json` |
+| `src/handlers/weather.js` | Updated | Cache-first geocoding lookup |
+| `location.json` | Auto-created | Geocoding cache (persisted between runs) |
+| `TODO.md` | Updated | Day 03 tasks all checked |
+| `DEVLOG.md` | Updated | Added Day 03 session log |
+
+## Status
+
+Complete. All Day 03 acceptance criteria verified.

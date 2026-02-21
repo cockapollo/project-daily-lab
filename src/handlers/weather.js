@@ -1,4 +1,5 @@
 const https = require('https');
+const locationCache = require('../cache/location');
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
@@ -40,16 +41,24 @@ async function weatherHandler(req, res) {
   }
 
   try {
-    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-    const geoData = await fetchJson(geoUrl);
+    let cached = locationCache.get(city);
+    let latitude, longitude, name;
 
-    if (!geoData.results || geoData.results.length === 0) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `City not found: ${city}` }));
-      return;
+    if (cached) {
+      ({ latitude, longitude, name } = cached);
+    } else {
+      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+      const geoData = await fetchJson(geoUrl);
+
+      if (!geoData.results || geoData.results.length === 0) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `City not found: ${city}` }));
+        return;
+      }
+
+      ({ latitude, longitude, name } = geoData.results[0]);
+      locationCache.set(city, { name, latitude, longitude });
     }
-
-    const { latitude, longitude, name } = geoData.results[0];
 
     const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
     const forecastData = await fetchJson(forecastUrl);
