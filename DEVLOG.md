@@ -65,3 +65,55 @@ Method Not Allowed
 ## Status
 
 Complete. All acceptance criteria verified.
+
+---
+
+# Development Log - Day 02: Weather API Endpoint
+
+**Date:** 2026-02-21
+
+## Session Summary
+
+Extended the Day 01 Node.js API service with a new `/weather?city={city}` endpoint that fetches geolocation and current weather data from the Open-Meteo public APIs and returns a JSON response.
+
+## Steps Performed
+
+### 1. Created Specification (`day02.md`)
+- Defined new endpoint: `GET /weather?city={city}` → 200 JSON
+- Defined error handling: 400 (missing param), 404 (city not found), 405 (wrong method), 502 (upstream API error)
+- Documented Open-Meteo Geocoding API and Forecast API (both free, no API key)
+- Specified project structure changes and implementation constraints (built-in `https` module only)
+
+### 2. Updated Task List (`TODO.md`)
+- Added Day 02 section with 2 implementation tasks and 5 verification tasks
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `day02.md` | Created | Weather endpoint specification |
+| `TODO.md` | Updated | Added Day 02 task checklist |
+| `DEVLOG.md` | Updated | Added Day 02 session log |
+| `src/handlers/weather.js` | Created | Weather handler — Geocoding + Forecast API calls |
+| `src/router.js` | Updated | Added `/weather` route |
+
+## Implementation Notes
+
+- Used built-in `https.request` (not `https.get`) to force `family: 4` (IPv4).
+  - Root cause: `api.open-meteo.com` resolves to both IPv4 and IPv6; Node.js preferred IPv6 which timed out on this machine; curl defaulted to IPv4 and succeeded.
+
+## Verification Results
+
+All 5 acceptance criteria passed:
+
+```
+D2-2.1: GET /weather?city=Tokyo       → 200 {"city":"Tokyo","latitude":35.6895,"longitude":139.69171,"temperature":8.8,"windspeed":2,"weathercode":0,"time":"2026-02-21T11:15"}
+D2-2.2: GET /weather                  → 400 {"error":"Missing required query parameter: city"}
+D2-2.3: GET /weather?city=Nonexist... → 404 {"error":"City not found: Nonexistentplace12345"}
+D2-2.4: POST /weather?city=Tokyo      → 405 {"error":"Method Not Allowed"}
+D2-2.5: GET /hello                    → 200 hello world!  (regression pass)
+```
+
+## Status
+
+Complete. All Day 02 acceptance criteria verified.

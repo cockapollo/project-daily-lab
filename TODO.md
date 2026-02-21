@@ -26,3 +26,29 @@ Reference: [day01.md](./day01.md)
 
 - No external dependencies — use only Node.js built-in modules
 - Implementation order: handlers first (2.1), then router (2.2), then server (2.3) — each layer builds on the previous one
+
+---
+
+# TODO - Day 02: Weather API Endpoint
+
+Reference: [day02.md](./day02.md)
+
+## Phase 1: Implementation
+
+- [x] **D2-1.1** Create `src/handlers/weather.js` — handler that reads `city` query param, calls Geocoding API, calls Forecast API, and returns JSON response
+- [x] **D2-1.2** Update `src/router.js` — add `/weather` route pointing to the weather handler
+
+## Phase 2: Verification
+
+- [x] **D2-2.1** Start the server and test `GET /weather?city=Tokyo` — expect 200 JSON with all fields
+- [x] **D2-2.2** Test `GET /weather` (no param) — expect 400 `{"error":"Missing required query parameter: city"}`
+- [x] **D2-2.3** Test `GET /weather?city=Nonexistentplace12345` — expect 404 `{"error":"City not found: ..."}`
+- [x] **D2-2.4** Test `POST /weather?city=Tokyo` — expect 405 `{"error":"Method Not Allowed"}`
+- [x] **D2-2.5** Confirm `GET /hello` still returns 200 `hello world!`
+
+## Notes
+
+- Use built-in `https` module for external API calls — no `node-fetch` or `axios`
+- Call APIs sequentially: geocoding first to get lat/lng, then forecast
+- All JSON responses (including errors) must use `Content-Type: application/json`
+- External APIs: Open-Meteo (no API key required)

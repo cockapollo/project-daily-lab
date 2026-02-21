@@ -1,7 +1,9 @@
 const helloHandler = require('./handlers/hello');
+const weatherHandler = require('./handlers/weather');
 
 const routes = {
   '/hello': helloHandler,
+  '/weather': weatherHandler,
 };
 
 function router(req, res) {
