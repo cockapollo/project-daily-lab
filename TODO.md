@@ -75,3 +75,28 @@ Reference: [log/day03.md](./log/day03.md)
 ## Future Tasks (not scheduled)
 
 - [ ] **D3-Future** Add capability to compare cached location against live Geocoding API result and flag/update on coordinate mismatch
+
+---
+
+# TODO - Day 04: SQLite Geocoding Cache
+
+Reference: [log/day04.md](./log/day04.md)
+
+## Phase 1: Setup
+
+- [ ] **D4-1.1** Run `npm install better-sqlite3` and confirm it appears in `package.json` dependencies
+- [ ] **D4-1.2** Delete `location.json` (no longer used)
+
+## Phase 2: Implementation
+
+- [ ] **D4-2.1** Update `src/cache/location.js` — open `location.db` with `better-sqlite3`, create `locations` table on startup, implement `get` (SELECT + JSON.parse coordinates) and `set` (INSERT OR REPLACE + JSON.stringify coordinates)
+
+## Phase 3: Verification
+
+- [ ] **D4-3.1** `npm install` completes without errors; `better-sqlite3` present in `node_modules/`
+- [ ] **D4-3.2** First `GET /weather?city=Tokyo` → 200 JSON; `location.db` created; `sqlite3 location.db "SELECT * FROM locations;"` shows a `"tokyo"` row with JSON coordinates
+- [ ] **D4-3.3** Second `GET /weather?city=Tokyo` → 200 JSON from SQLite cache (Geocoding API not called)
+- [ ] **D4-3.4** `GET /weather?city=tokyo` (lowercase) → 200 JSON cache hit
+- [ ] **D4-3.5** `GET /weather?city=Nonexistentplace12345` → 404; row count in `locations` unchanged
+- [ ] **D4-3.6** Confirm `location.json` is not created or written during any of the above requests
+- [ ] **D4-3.7** Confirm `GET /hello` still returns 200 `hello world!`
