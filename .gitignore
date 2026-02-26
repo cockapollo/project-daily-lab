@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# SQLite database
+*.db
+
+# OS
+.DS_Store
