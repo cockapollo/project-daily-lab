@@ -93,10 +93,36 @@ Reference: [log/day04.md](./log/day04.md)
 
 ## Phase 3: Verification
 
-- [ ] **D4-3.1** `npm install` completes without errors; `better-sqlite3` present in `node_modules/`
-- [ ] **D4-3.2** First `GET /weather?city=Tokyo` → 200 JSON; `location.db` created; `sqlite3 location.db "SELECT * FROM locations;"` shows a `"tokyo"` row with JSON coordinates
-- [ ] **D4-3.3** Second `GET /weather?city=Tokyo` → 200 JSON from SQLite cache (Geocoding API not called)
-- [ ] **D4-3.4** `GET /weather?city=tokyo` (lowercase) → 200 JSON cache hit
-- [ ] **D4-3.5** `GET /weather?city=Nonexistentplace12345` → 404; row count in `locations` unchanged
-- [ ] **D4-3.6** Confirm `location.json` is not created or written during any of the above requests
-- [ ] **D4-3.7** Confirm `GET /hello` still returns 200 `hello world!`
+- [x] **D4-3.1** `npm install` completes without errors; `better-sqlite3` present in `node_modules/`
+- [x] **D4-3.2** First `GET /weather?city=Tokyo` → 200 JSON; `location.db` created; `sqlite3 location.db "SELECT * FROM locations;"` shows a `"tokyo"` row with JSON coordinates
+- [x] **D4-3.3** Second `GET /weather?city=Tokyo` → 200 JSON from SQLite cache (Geocoding API not called)
+- [x] **D4-3.4** `GET /weather?city=tokyo` (lowercase) → 200 JSON cache hit
+- [x] **D4-3.5** `GET /weather?city=Nonexistentplace12345` → 404; row count in `locations` unchanged
+- [x] **D4-3.6** Confirm `location.json` is not created or written during any of the above requests
+- [x] **D4-3.7** Confirm `GET /hello` still returns 200 `hello world!`
+
+---
+
+# TODO - Day 05: Weather History Storage
+
+Reference: [log/day05.md](./log/day05.md)
+
+## Phase 1: Implementation
+
+- [x] **D5-1.1** Rename `location.db` to `store.db`
+- [x] **D5-1.2** Update `src/cache/location.js` — change DB path to `store.db`
+- [x] **D5-1.3** Create `src/cache/weather.js` — open `store.db`, create `weather_history` table with `PRIMARY KEY (city, time)`, expose `get(city, time)` and `set(city, time, data)` using `INSERT OR IGNORE`
+- [x] **D5-1.4** Update `src/handlers/weather.js` — call `weatherHistory.set(name, time, { temperature, windspeed, weathercode })` after each successful fetch
+
+## Phase 2: Verification
+
+- [x] **D5-2.1** `GET /weather?city=Tokyo` → 200 JSON; `sqlite3 store.db "SELECT * FROM weather_history;"` shows a `"tokyo"` row with JSON data
+- [x] **D5-2.2** Second `GET /weather?city=Tokyo` within same time interval → 200 JSON; row count in `weather_history` unchanged (duplicate ignored)
+- [x] **D5-2.3** `GET /weather?city=Osaka` → 200 JSON; a separate `"osaka"` row inserted
+- [x] **D5-2.4** Confirm `GET /hello` still returns 200 `hello world!`
+
+## Future Tasks (not scheduled)
+
+- [ ] **D5-Future-1** Add `GET /history?city={city}` endpoint to query stored weather records
+- [ ] **D5-Future-2** Join `weather_history` with `locations` to enrich history responses with lat/lng
+- [ ] **D5-Future-3** Aggregate queries for analytics (daily averages, temperature trends)

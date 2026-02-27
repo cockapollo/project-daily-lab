@@ -191,3 +191,120 @@ D3-2.5: GET /hello                    → 200 hello world!  (regression pass)
 ## Status
 
 Complete. All Day 03 acceptance criteria verified.
+
+---
+
+# Development Log - Day 04: SQLite Geocoding Cache
+
+**Date:** 2026-02-24
+
+## Session Summary
+
+Replaced the Day 03 file-based geocoding cache (`location.json`) with a SQLite database (`location.db`) using `better-sqlite3`. The public `get`/`set` API of `src/cache/location.js` remained unchanged so `weather.js` required no modification.
+
+## Steps Performed
+
+### 1. Created Specification (`log/day04.md`)
+- Defined `locations` table schema with `city` TEXT PRIMARY KEY, `name` TEXT, `coordinates` TEXT (JSON)
+- Specified `INSERT OR REPLACE` for upsert behaviour
+- Documented `better-sqlite3` installation requirement
+
+### 2. Updated Task List (`TODO.md`)
+- Added Day 04 section with setup, implementation, and verification tasks
+
+### 3. Phase 1 — Setup
+- Ran `npm install better-sqlite3`
+- Deleted `location.json`
+
+### 4. Phase 2 — Implementation
+- **`src/cache/location.js`** — rewritten to open `location.db`, create table on startup, and use prepared statements for `get`/`set`
+
+### 5. Phase 3 — Verification
+
+All acceptance criteria passed:
+
+```
+D4-3.2: GET /weather?city=Tokyo       → 200 JSON; location.db created; "tokyo" row with JSON coordinates
+D4-3.3: GET /weather?city=Tokyo       → 200 JSON from SQLite cache
+D4-3.4: GET /weather?city=tokyo       → 200 JSON cache hit (lowercase)
+D4-3.5: GET /weather?city=Nonexist... → 404; location.db row count unchanged
+D4-3.6: location.json not written
+D4-3.7: GET /hello                    → 200 hello world!
+```
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day04.md` | Created | SQLite cache specification |
+| `TODO.md` | Updated | Added Day 04 tasks |
+| `DEVLOG.md` | Updated | Added Day 04 session log |
+| `src/cache/location.js` | Updated | SQLite-backed cache using better-sqlite3 |
+| `package.json` | Updated | Added better-sqlite3 dependency |
+| `location.json` | Deleted | Replaced by SQLite |
+| `location.db` | Auto-created | SQLite database file |
+
+## Status
+
+Complete. All Day 04 acceptance criteria verified.
+
+---
+
+# Development Log - Day 05: Weather History Storage
+
+**Date:** 2026-02-27
+
+## Session Summary
+
+Added persistent historical storage for weather API responses. Renamed `location.db` to `store.db` to consolidate all SQLite data under a single, clearly named file. Introduced a `weather_history` table with a composite primary key `(city, time)` to prevent duplicate entries. Each successful `/weather` request now records the weather payload as a JSON blob.
+
+## Steps Performed
+
+### 1. Renamed database file
+- `location.db` → `store.db`
+- Updated `src/cache/location.js` DB path accordingly
+
+### 2. Created Specification (`log/day05.md`)
+- Defined `weather_history` table schema
+- Documented JSON blob format (no lat/lng — available via `locations` table)
+- Specified `INSERT OR IGNORE` deduplication strategy
+
+### 3. Updated Task List (`TODO.md`)
+- Added Day 05 section with implementation and verification tasks
+
+### 4. Implementation
+- **`src/cache/weather.js`** — new module opening `store.db`, creating `weather_history` table on startup, exposing `get(city, time)` and `set(city, time, data)` with prepared statements
+- **`src/handlers/weather.js`** — added `weatherHistory.set(name, time, ...)` call after each successful API fetch
+
+### 5. Verification
+
+All acceptance criteria passed:
+
+```
+D5-2.1: GET /weather?city=Tokyo       → 200 JSON; weather_history row inserted (tokyo, 2026-02-27T01:30)
+D5-2.2: GET /weather?city=Tokyo again → 200 JSON; row count unchanged (duplicate ignored)
+D5-2.3: GET /weather?city=Osaka       → 200 JSON; separate row inserted for osaka
+D5-2.4: GET /hello                    → 200 hello world!  (regression pass)
+```
+
+```
+sqlite3 store.db "SELECT city, time, data FROM weather_history;"
+tokyo|2026-02-27T01:30|{"temperature":10.6,"windspeed":4.3,"weathercode":2}
+osaka|2026-02-27T01:30|{"temperature":12.4,"windspeed":5.4,"weathercode":2}
+```
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day05.md` | Created | Weather history specification |
+| `TODO.md` | Updated | Added Day 05 tasks |
+| `DEVLOG.md` | Updated | Added Day 05 session log |
+| `store.db` | Renamed from `location.db` | Consolidated SQLite database |
+| `src/cache/location.js` | Updated | DB path changed to store.db |
+| `src/cache/weather.js` | Created | Weather history cache module |
+| `src/handlers/weather.js` | Updated | Saves each weather response to history |
+
+## Status
+
+Complete. All Day 05 acceptance criteria verified.
