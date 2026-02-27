@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_FILE = path.join(__dirname, '../../location.db');
+const DB_FILE = path.join(__dirname, '../../store.db');
 const db = new Database(DB_FILE);
 
 db.exec(`

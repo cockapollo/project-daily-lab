@@ -1,5 +1,6 @@
 const https = require('https');
 const locationCache = require('../cache/location');
+const weatherHistory = require('../cache/weather');
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
@@ -64,6 +65,8 @@ async function weatherHandler(req, res) {
     const forecastData = await fetchJson(forecastUrl);
 
     const { temperature, windspeed, weathercode, time } = forecastData.current_weather;
+
+    weatherHistory.set(name, time, { temperature, windspeed, weathercode });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ city: name, latitude, longitude, temperature, windspeed, weathercode, time }));
