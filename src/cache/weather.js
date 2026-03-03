@@ -15,6 +15,7 @@ db.exec(`
 
 const stmtGet = db.prepare('SELECT data FROM weather_history WHERE city = ? AND time = ?');
 const stmtSet = db.prepare('INSERT OR IGNORE INTO weather_history (city, time, data) VALUES (?, ?, ?)');
+const stmtHistory = db.prepare('SELECT time, data FROM weather_history WHERE city = ? ORDER BY time ASC');
 
 function get(city, time) {
   const row = stmtGet.get(city.toLowerCase(), time);
@@ -27,4 +28,11 @@ function set(city, time, data) {
   stmtSet.run(city.toLowerCase(), time, JSON.stringify({ temperature, windspeed, weathercode }));
 }
 
-module.exports = { get, set };
+function getHistory(city) {
+  return stmtHistory.all(city.toLowerCase()).map(row => {
+    const { temperature, windspeed, weathercode } = JSON.parse(row.data);
+    return { time: row.time, temperature, windspeed, weathercode };
+  });
+}
+
+module.exports = { get, set, getHistory };

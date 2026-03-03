@@ -126,3 +126,34 @@ Reference: [log/day05.md](./log/day05.md)
 - [ ] **D5-Future-1** Add `GET /history?city={city}` endpoint to query stored weather records
 - [ ] **D5-Future-2** Join `weather_history` with `locations` to enrich history responses with lat/lng
 - [ ] **D5-Future-3** Aggregate queries for analytics (daily averages, temperature trends)
+
+---
+
+# TODO - Day 06: Weather Summary Endpoint (AI-Generated)
+
+Reference: [log/day06.md](./log/day06.md)
+
+## Phase 1: Implementation
+
+- [x] **D6-1.1** Add `getHistory(city)` to `src/cache/weather.js` — returns all rows for a city ordered by `time ASC`
+- [x] **D6-1.2** Create `src/handlers/summary.js` — validate request, fetch history, build prompt, call Claude API, return `{ city, record_count, summary }`
+- [x] **D6-1.3** Update `src/router.js` — register `/summary` route
+
+## Phase 2: Prompt Refinement
+
+- [x] **D6-2.1** Tighten system prompt to restrict Claude to provided data only (prevent inference beyond DB records)
+
+## Phase 3: Verification
+
+- [x] **D6-3.1** `GET /summary?city=Tokyo` (after seeding history) → 200 `{ city, record_count, summary }`
+- [x] **D6-3.2** `GET /summary` (no city) → 400
+- [x] **D6-3.3** `GET /summary?city=Atlantis` (no history) → 404
+- [x] **D6-3.4** `POST /summary?city=Tokyo` → 405
+- [x] **D6-3.5** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200
+
+## Future Tasks (not scheduled)
+
+- [ ] **D6-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising
+- [ ] **D6-Future-2** Decode weathercodes into labels before sending to Claude (eliminate remaining inference)
+- [ ] **D6-Future-3** Cache the generated summary briefly to avoid repeated API calls for the same city
+- [ ] **D6-Future-4** Stream the Claude response back to the caller for lower time-to-first-byte

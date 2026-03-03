@@ -1,9 +1,11 @@
 const helloHandler = require('./handlers/hello');
 const weatherHandler = require('./handlers/weather');
+const summaryHandler = require('./handlers/summary');
 
 const routes = {
   '/hello': helloHandler,
   '/weather': weatherHandler,
+  '/summary': summaryHandler,
 };
 
 function router(req, res) {

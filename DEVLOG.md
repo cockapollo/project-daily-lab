@@ -308,3 +308,65 @@ osaka|2026-02-27T01:30|{"temperature":12.4,"windspeed":5.4,"weathercode":2}
 ## Status
 
 Complete. All Day 05 acceptance criteria verified.
+
+---
+
+# Development Log - Day 06: Weather Summary Endpoint (AI-Generated)
+
+**Date:** 2026-03-04
+
+## Session Summary
+
+Added a `GET /summary?city={city}` endpoint that reads stored weather history from `store.db`, formats it as a natural-language prompt, sends it to the Claude API (`claude-haiku-4-5-20251001`), and returns a 2–3 sentence summary grounded in the actual recorded data.
+
+## Steps Performed
+
+### 1. Created Specification (`log/day06.md`)
+- Defined 4-step flow: fetch DB records → format prompt → call Claude API → return summary
+- Specified response shape: `{ city, record_count, summary }`
+- Documented error cases: 400 (missing city), 404 (no history), 405 (wrong method), 502 (API failure)
+- Noted importance of restricting Claude to provided data only
+
+### 2. Implementation
+
+- **`src/cache/weather.js`** — added `getHistory(city)` using a new prepared statement; returns all rows ordered by `time ASC` as `{ time, temperature, windspeed, weathercode }` objects
+- **`src/handlers/summary.js`** — new handler: validates request, fetches history, builds context string, calls Claude API via `https.request`, returns `{ city, record_count, summary }`
+- **`src/router.js`** — registered `/summary` route
+
+### 3. Prompt Refinement
+
+Initial system prompt (`"Summarize weather trends concisely in 2-3 sentences"`) caused Claude to infer beyond the data — e.g. interpreting WMO weathercodes using its own knowledge and adding seasonal context not present in the records. Since the point of the endpoint is to summarise the DB data, not Claude's general knowledge, the prompt was tightened to:
+
+> "You are a weather analyst. Summarize the weather trend in 2-3 sentences using only the data provided. Do not add external knowledge, forecasts, or inferences beyond what the records show."
+
+### 4. Verification
+
+```
+GET /summary?city=Tokyo → 200
+{
+  "city": "Tokyo",
+  "record_count": 2,
+  "summary": "Tokyo experienced a significant cooling trend from late February to early March 2026, with temperatures dropping from 10.6°C to 2.9°C over five days. Wind speeds increased notably during this period, rising from 4.3 km/h to 11.8 km/h. The weather code change from 2 to 63 indicates a shift to more severe weather conditions."
+}
+```
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day06.md` | Created | AI summary endpoint specification |
+| `TODO.md` | Updated | Added Day 06 tasks |
+| `DEVLOG.md` | Updated | Added Day 06 session log |
+| `src/cache/weather.js` | Updated | Added `getHistory(city)` function |
+| `src/handlers/summary.js` | Created | GET /summary handler with Claude API call |
+| `src/router.js` | Updated | Registered `/summary` route |
+
+## Implementation Notes
+
+- Used Node's built-in `https` module for the Claude API call (consistent with existing `weather.js` pattern; no new dependencies added).
+- `ANTHROPIC_API_KEY` must be set in the environment before starting the server.
+- No `.env` file in the project — key is passed via shell environment.
+
+## Status
+
+Complete. All Day 06 acceptance criteria verified.
