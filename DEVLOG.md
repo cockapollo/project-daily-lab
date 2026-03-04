@@ -370,3 +370,44 @@ GET /summary?city=Tokyo → 200
 ## Status
 
 Complete. All Day 06 acceptance criteria verified.
+
+---
+
+# Development Log - Day 07: Summary Cache (TTL + Content-Based)
+
+**Date:** 2026-03-04
+
+## Session Summary
+
+Added a SQLite-backed cache for the `GET /summary` endpoint to prevent calling the Claude API on every request. Implemented a hybrid invalidation strategy: a configurable minimum TTL (default 60 min) protects against burst traffic, combined with content-based invalidation that also skips regeneration when the underlying weather history hasn't changed after the TTL expires.
+
+Key finding during design: Open-Meteo `current_weather.time` uses **15-minute intervals** (not hourly as assumed), meaning new history records can arrive up to 4× per hour — making the minimum TTL essential.
+
+## Steps Performed
+
+### 1. Created Specification (`log/day07.md`)
+- Documented hybrid cache logic (TTL floor + content-based invalidation)
+- Defined `summary_cache` table schema
+- Specified `SUMMARY_CACHE_TTL_MIN` env var for external TTL configuration
+
+### 2. Implementation
+
+- **`src/cache/summary.js`** — new module; opens `store.db`, creates `summary_cache` table on startup, exposes `get(city)` and `set(city, summary, basedOnRecordTime)` with prepared statements
+- **`src/handlers/summary.js`** — reads `SUMMARY_CACHE_TTL_MIN` env var (default 60) at module load; applies hybrid cache check before calling Claude; stores result after fresh generation; adds `cached: true/false` to all 200 responses
+
+### 3. Variable Naming Fix
+- `cached` variable conflict: `locationCache.get(city)` result renamed to `location` to avoid clash with `summaryCache.get(displayName)` result
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day07.md` | Created | Summary cache specification |
+| `TODO.md` | Updated | Added Day 07 tasks; marked D6-Future-3 complete |
+| `DEVLOG.md` | Updated | Added Day 07 session log |
+| `src/cache/summary.js` | Created | SQLite summary cache module |
+| `src/handlers/summary.js` | Updated | Hybrid cache logic + `cached` field in response |
+
+## Status
+
+Complete. All Day 07 acceptance criteria verified.

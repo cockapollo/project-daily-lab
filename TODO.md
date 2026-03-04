@@ -155,5 +155,29 @@ Reference: [log/day06.md](./log/day06.md)
 
 - [ ] **D6-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising
 - [ ] **D6-Future-2** Decode weathercodes into labels before sending to Claude (eliminate remaining inference)
-- [ ] **D6-Future-3** Cache the generated summary briefly to avoid repeated API calls for the same city
+- [x] **D6-Future-3** Cache the generated summary briefly to avoid repeated API calls for the same city → implemented in Day 07
 - [ ] **D6-Future-4** Stream the Claude response back to the caller for lower time-to-first-byte
+
+---
+
+# TODO - Day 07: Summary Cache (TTL + Content-Based)
+
+Reference: [log/day07.md](./log/day07.md)
+
+## Phase 1: Implementation
+
+- [x] **D7-1.1** Create `src/cache/summary.js` — open `store.db`, create `summary_cache` table, expose `get(city)` and `set(city, summary, basedOnRecordTime)`
+- [x] **D7-1.2** Update `src/handlers/summary.js` — read `SUMMARY_CACHE_TTL_MIN` env var (default 60), apply hybrid cache check, store result after fresh generation, add `cached` field to response
+
+## Phase 2: Verification
+
+- [ ] **D7-2.1** First `GET /summary?city=Tokyo` → 200 with `"cached": false`; row present in `summary_cache`
+- [ ] **D7-2.2** Immediate second request → 200 with `"cached": true`; Claude API not called
+- [ ] **D7-2.3** `SUMMARY_CACHE_TTL_MIN=120 npm start` — confirm 120-min TTL is applied
+- [ ] **D7-2.4** Regression: `GET /hello`, `GET /weather?city=Tokyo`, `GET /summary?city=Tokyo` all return 200
+
+## Future Tasks (not scheduled)
+
+- [ ] **D7-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising
+- [ ] **D7-Future-2** Decode weathercodes into human-readable labels before sending to Claude
+- [ ] **D7-Future-3** Stream the Claude response back to the caller for lower time-to-first-byte
