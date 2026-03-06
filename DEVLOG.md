@@ -411,3 +411,61 @@ Key finding during design: Open-Meteo `current_weather.time` uses **15-minute in
 ## Status
 
 Complete. All Day 07 acceptance criteria verified.
+
+---
+
+# Development Log - Day 08: MAX(time) Fix + Date-Range Filters
+
+**Date:** 2026-03-05
+
+## Session Summary
+
+Two focused improvements to the `/summary` endpoint:
+
+1. **Safety fix** — replaced the array-position assumption (`history[history.length - 1].time`) for `latestRecordTime` with a dedicated `SELECT MAX(time)` SQL query. The array approach was correct while `getHistory` had no filters, but would have silently broken the cache invalidation logic once range filters were added.
+
+2. **Date-range filters** — implemented `?from` and `?to` query parameters on `GET /summary` to scope the history window before summarising. When either filter is active, the summary cache is bypassed entirely (filtered results are request-specific and should not pollute or be served from the full-city cache).
+
+## Steps Performed
+
+### 1. `src/cache/weather.js` — `getLatestTime` + dynamic `getHistory`
+
+- Removed the static `stmtHistory` prepared statement
+- Added `stmtLatestTime` — `SELECT MAX(time) AS maxTime FROM weather_history WHERE city = ?`
+- Added `getLatestTime(city)` — returns the true latest record time from the DB, regardless of any range filter applied on the history query
+- Updated `getHistory(city, from, to)` — builds SQL dynamically with optional `AND time >= ?` / `AND time <= ?` clauses; `from` and `to` default to `undefined` (backward-compatible with no-filter callers)
+
+### 2. `src/handlers/summary.js` — consume new API + cache bypass
+
+- Reads `?from` and `?to` from `searchParams` (lines 58–59)
+- Passes them to `getHistory(city, from, to)` (line 67)
+- Calls `getLatestTime(city)` for `latestRecordTime` — always the DB-wide max, not bounded by the filter (line 79)
+- Wraps cache read and cache write in `if (!isFiltered)` guard — filtered requests always call Claude fresh and never write to the cache
+
+## Design Decisions
+
+- **`MAX(time)` over array tail:** `ORDER BY time ASC` without `LIMIT` made the tail approach technically safe today, but it was an implicit contract. A SQL aggregate is self-documenting and immune to future ordering changes or filtered-result confusion.
+- **Skip cache for filtered requests:** Caching filtered summaries would require a composite key `(city, from, to)` and cache-busting rules for each combination. The simpler rule — no cache when filters are present — is correct and avoids cache pollution.
+- **String comparison for ISO timestamps:** `time` is stored as ISO 8601 strings (e.g. `2026-03-05T12:00`). SQLite string comparison with date prefixes like `2026-03-05` is lexicographically correct and requires no date parsing.
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `TODO.md` | Updated | Added Day 08 tasks; marked D6-Future-1 / D7-Future-1 complete |
+| `DEVLOG.md` | Updated | Added Day 08 session log |
+| `src/cache/weather.js` | Updated | Added `getLatestTime`; updated `getHistory` with optional `from`/`to` |
+| `src/handlers/summary.js` | Updated | Reads `?from`/`?to`; uses `getLatestTime`; bypasses cache when filtered |
+
+## Usage
+
+```
+GET /summary?city=Tokyo                                   # full history, cache active
+GET /summary?city=Tokyo&from=2026-01-01                   # from date onwards, no cache
+GET /summary?city=Tokyo&to=2026-03-01                     # up to date, no cache
+GET /summary?city=Tokyo&from=2026-01-01&to=2026-03-01     # explicit range, no cache
+```
+
+## Status
+
+Complete.

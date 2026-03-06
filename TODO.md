@@ -153,7 +153,7 @@ Reference: [log/day06.md](./log/day06.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D6-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising
+- [x] **D6-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising → implemented in Day 08
 - [ ] **D6-Future-2** Decode weathercodes into labels before sending to Claude (eliminate remaining inference)
 - [x] **D6-Future-3** Cache the generated summary briefly to avoid repeated API calls for the same city → implemented in Day 07
 - [ ] **D6-Future-4** Stream the Claude response back to the caller for lower time-to-first-byte
@@ -178,6 +178,34 @@ Reference: [log/day07.md](./log/day07.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D7-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising
+- [x] **D7-Future-1** Add `?from` / `?to` date-range filters to scope history before summarising → implemented in Day 08
 - [ ] **D7-Future-2** Decode weathercodes into human-readable labels before sending to Claude
 - [ ] **D7-Future-3** Stream the Claude response back to the caller for lower time-to-first-byte
+
+---
+
+# TODO - Day 08: MAX(time) Fix + Date-Range Filters
+
+Reference: [log/day08.md](./log/day08.md)
+
+## Phase 1: Safety Fix — MAX(time)
+
+- [x] **D8-1.1** Add `getLatestTime(city)` to `src/cache/weather.js` using `SELECT MAX(time)` — replaces the fragile array-tail assumption
+- [x] **D8-1.2** Update `src/handlers/summary.js` — call `getLatestTime(city)` for `latestRecordTime` instead of `history[history.length - 1].time`
+
+## Phase 2: Date-Range Filters
+
+- [x] **D8-2.1** Update `getHistory(city, from, to)` in `src/cache/weather.js` — build SQL dynamically with optional `AND time >= ?` / `AND time <= ?` clauses
+- [x] **D8-2.2** Update `src/handlers/summary.js` — read `?from` / `?to` from query params; pass to `getHistory`; bypass cache read/write when either filter is set
+
+## Phase 3: Verification
+
+- [ ] **D8-3.1** `GET /summary?city=Tokyo` → 200 with `cached: false` on first call, `cached: true` on second (cache still works)
+- [ ] **D8-3.2** `GET /summary?city=Tokyo&from=2026-01-01` → 200 with `cached: false`; Claude called fresh; repeat call also returns `cached: false`
+- [ ] **D8-3.3** `GET /summary?city=Tokyo&from=2026-01-01&to=2026-12-31` → 200 or 404 depending on data range
+- [ ] **D8-3.4** Regression: `GET /hello`, `GET /weather?city=Tokyo`, `GET /summary?city=Tokyo` all return 200
+
+## Future Tasks (not scheduled)
+
+- [ ] **D8-Future-1** Decode weathercodes into human-readable labels before sending to Claude
+- [ ] **D8-Future-2** Stream the Claude response back to the caller for lower time-to-first-byte

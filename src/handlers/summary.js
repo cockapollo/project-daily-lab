@@ -55,6 +55,8 @@ async function summaryHandler(req, res) {
 
   const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
   const city = searchParams.get('city');
+  const from = searchParams.get('from') || undefined;
+  const to   = searchParams.get('to')   || undefined;
 
   if (!city) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -62,7 +64,7 @@ async function summaryHandler(req, res) {
     return;
   }
 
-  const history = weatherHistory.getHistory(city);
+  const history = weatherHistory.getHistory(city, from, to);
 
   if (history.length === 0) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -73,15 +75,18 @@ async function summaryHandler(req, res) {
   const location = locationCache.get(city);
   const displayName = location ? location.name : city;
 
-  const latestRecordTime = history[history.length - 1].time;
+  const isFiltered = from || to;
+  const latestRecordTime = weatherHistory.getLatestTime(city);
 
-  const cached = summaryCache.get(displayName);
-  if (cached) {
-    const age = Date.now() - cached.cached_at;
-    if (age < TTL_MS || cached.based_on_record_time === latestRecordTime) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ city: displayName, record_count: history.length, summary: cached.summary, cached: true }));
-      return;
+  if (!isFiltered) {
+    const cached = summaryCache.get(displayName);
+    if (cached) {
+      const age = Date.now() - cached.cached_at;
+      if (age < TTL_MS || cached.based_on_record_time === latestRecordTime) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ city: displayName, record_count: history.length, summary: cached.summary, cached: true }));
+        return;
+      }
     }
   }
 
@@ -93,7 +98,9 @@ async function summaryHandler(req, res) {
 
   try {
     const summary = await callClaude(prompt);
-    summaryCache.set(displayName, summary, latestRecordTime);
+    if (!isFiltered) {
+      summaryCache.set(displayName, summary, latestRecordTime);
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ city: displayName, record_count: history.length, summary, cached: false }));
   } catch (err) {
