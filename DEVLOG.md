@@ -469,3 +469,70 @@ GET /summary?city=Tokyo&from=2026-01-01&to=2026-03-01     # explicit range, no c
 ## Status
 
 Complete.
+
+---
+
+# Development Log - Day 09: Summary Length & Mode Parameters
+
+**Date:** 2026-04-21
+
+## Session Summary
+
+Added two optional query parameters to `GET /summary` for finer control over the AI-generated response:
+
+- **`?length=brief|normal|detailed`** (default `normal`) — controls verbosity from 1 sentence to a full paragraph
+- **`?mode=trend|anomaly`** (optional) — shifts Claude's analytical focus toward directional patterns or outlier detection
+
+The parameters are orthogonal and can be combined freely. Both are expressed through a dynamically built system prompt. Cache is bypassed for any non-default combination (consistent with the existing `isFiltered` rule for date-range requests).
+
+## Design Decisions
+
+- **Two separate params over one `mode` enum:** A single enum (e.g. `mode=detailed-trend`) would be combinatorially unwieldy and prevent independent control of length and focus. Two params keep the surface clean.
+- **`detailed` not `detail`:** Consistent adjective form alongside `brief` and `normal`.
+- **Cache bypass for non-default:** Caching per `(city, length, mode)` composite key is possible but adds eviction complexity. Non-default requests are typically intentional/exploratory, so skipping cache is the simpler correct choice for now. Tracked as D9-Future-1.
+- **D8-Future-1 backlog noted:** Raw `weathercode` integers limit the quality of `mode=anomaly` output (Claude must infer code meanings). Weathercode decoding is the highest-value follow-up for these new modes.
+
+## Steps Performed
+
+### 1. Created Specification (`log/day09.md`)
+- Defined both parameters, valid values, and default behaviour
+- Documented dynamic system prompt construction
+- Specified cache bypass rule (`skipCache = isFiltered || isCustomized`)
+- Listed 9 acceptance criteria
+
+### 2. Updated Task List (`TODO.md`)
+- Annotated D8-Future-1 with context from Day 09 design discussion
+- Added Day 09 section with implementation and verification tasks
+
+### 3. Implementation (`src/handlers/summary.js`)
+- Added `VALID_LENGTHS`, `VALID_MODES`, `LENGTH_INSTRUCTIONS`, `MODE_INSTRUCTIONS` constants
+- Added `buildSystemPrompt(length, mode)` — joins base instruction + length instruction + optional mode instruction
+- Updated `callClaude(systemPrompt, prompt)` — accepts system prompt as a parameter instead of hardcoding it
+- Added `?length` and `?mode` parsing and 400 validation in `summaryHandler`
+- Replaced `isFiltered`-only cache guard with `skipCache = isFiltered || isCustomized`
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day09.md` | Created | Length & mode parameter specification |
+| `TODO.md` | Updated | D8-Future-1 annotated; Day 09 tasks added |
+| `DEVLOG.md` | Updated | Added Day 09 session log |
+| `src/handlers/summary.js` | Updated | length + mode params, dynamic system prompt, cache bypass |
+
+## Usage
+
+```
+GET /summary?city=Tokyo                              # normal summary, cache active
+GET /summary?city=Tokyo&length=brief                 # 1-sentence, no cache
+GET /summary?city=Tokyo&length=detailed              # full paragraph, no cache
+GET /summary?city=Tokyo&mode=trend                   # trend-focused, no cache
+GET /summary?city=Tokyo&mode=anomaly                 # outlier-focused, no cache
+GET /summary?city=Tokyo&length=detailed&mode=trend   # combined, no cache
+GET /summary?city=Tokyo&length=bad                   # 400 Invalid value for length: bad
+GET /summary?city=Tokyo&mode=bad                     # 400 Invalid value for mode: bad
+```
+
+## Status
+
+Complete. All Day 09 acceptance criteria verified.

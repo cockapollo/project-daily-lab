@@ -5,11 +5,34 @@ const summaryCache = require('../cache/summary');
 
 const TTL_MS = (parseInt(process.env.SUMMARY_CACHE_TTL_MIN) || 60) * 60 * 1000;
 
-function callClaude(prompt) {
+const VALID_LENGTHS = ['brief', 'normal', 'detailed'];
+const VALID_MODES   = ['trend', 'anomaly'];
+
+const LENGTH_INSTRUCTIONS = {
+  brief:    'Respond in exactly 1 sentence.',
+  normal:   'Respond in 2-3 sentences.',
+  detailed: 'Respond in a full paragraph (4-6 sentences), covering temperature, wind, and weather conditions in depth.',
+};
+
+const MODE_INSTRUCTIONS = {
+  trend:   'Focus on directional patterns and changes over time — is it getting warmer, cooler, windier, or calmer?',
+  anomaly: 'Focus on outliers and unusual readings — flag any spikes, drops, or data points that deviate significantly from the rest.',
+};
+
+function buildSystemPrompt(length, mode) {
+  const parts = [
+    'You are a weather analyst. Use only the data provided. Do not add external knowledge, forecasts, or inferences beyond what the records show.',
+    LENGTH_INSTRUCTIONS[length],
+  ];
+  if (mode) parts.push(MODE_INSTRUCTIONS[mode]);
+  return parts.join(' ');
+}
+
+function callClaude(systemPrompt, prompt) {
   const body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 200,
-    system: 'You are a weather analyst. Summarize the weather trend in 2-3 sentences using only the data provided. Do not add external knowledge, forecasts, or inferences beyond what the records show.',
+    system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -54,13 +77,27 @@ async function summaryHandler(req, res) {
   }
 
   const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-  const city = searchParams.get('city');
-  const from = searchParams.get('from') || undefined;
-  const to   = searchParams.get('to')   || undefined;
+  const city   = searchParams.get('city');
+  const from   = searchParams.get('from') || undefined;
+  const to     = searchParams.get('to')   || undefined;
+  const length = searchParams.get('length') || 'normal';
+  const mode   = searchParams.get('mode')   || undefined;
 
   if (!city) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Missing required query parameter: city' }));
+    return;
+  }
+
+  if (!VALID_LENGTHS.includes(length)) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `Invalid value for length: ${length}` }));
+    return;
+  }
+
+  if (mode && !VALID_MODES.includes(mode)) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `Invalid value for mode: ${mode}` }));
     return;
   }
 
@@ -75,10 +112,13 @@ async function summaryHandler(req, res) {
   const location = locationCache.get(city);
   const displayName = location ? location.name : city;
 
-  const isFiltered = from || to;
+  const isFiltered   = from || to;
+  const isCustomized = length !== 'normal' || !!mode;
+  const skipCache    = isFiltered || isCustomized;
+
   const latestRecordTime = weatherHistory.getLatestTime(city);
 
-  if (!isFiltered) {
+  if (!skipCache) {
     const cached = summaryCache.get(displayName);
     if (cached) {
       const age = Date.now() - cached.cached_at;
@@ -94,11 +134,12 @@ async function summaryHandler(req, res) {
     .map(r => `${r.time} — temp: ${r.temperature}°C, wind: ${r.windspeed} km/h, code: ${r.weathercode}`)
     .join('\n');
 
-  const prompt = `City: ${displayName}. Weather history (oldest to newest):\n${context}\n\nSummarize the weather trend in 2-3 sentences.`;
+  const systemPrompt = buildSystemPrompt(length, mode);
+  const prompt = `City: ${displayName}. Weather history (oldest to newest):\n${context}\n\nSummarize the weather trend.`;
 
   try {
-    const summary = await callClaude(prompt);
-    if (!isFiltered) {
+    const summary = await callClaude(systemPrompt, prompt);
+    if (!skipCache) {
       summaryCache.set(displayName, summary, latestRecordTime);
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });

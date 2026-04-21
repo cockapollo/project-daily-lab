@@ -207,5 +207,33 @@ Reference: [log/day08.md](./log/day08.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D8-Future-1** Decode weathercodes into human-readable labels before sending to Claude
+- [ ] **D8-Future-1** Decode weathercodes into human-readable labels before sending to Claude (noted during Day 09 design — raw codes limit quality of `mode=anomaly` output)
 - [ ] **D8-Future-2** Stream the Claude response back to the caller for lower time-to-first-byte
+
+---
+
+# TODO - Day 09: Summary Length & Mode Parameters
+
+Reference: [log/day09.md](./log/day09.md)
+
+## Phase 1: Implementation
+
+- [x] **D9-1.1** Update `src/handlers/summary.js` — add `?length=brief|normal|detailed` (default `normal`) and `?mode=trend|anomaly` (optional); validate both params; build system prompt dynamically; bypass cache when non-default
+
+## Phase 2: Verification
+
+- [x] **D9-2.1** `GET /summary?city=Tokyo` → 200; behaviour unchanged (cache active, 2-3 sentence summary)
+- [x] **D9-2.2** `GET /summary?city=Tokyo&length=brief` → 200; 1-sentence summary; `cached: false` always
+- [x] **D9-2.3** `GET /summary?city=Tokyo&length=detailed` → 200; full paragraph; `cached: false` always
+- [x] **D9-2.4** `GET /summary?city=Tokyo&mode=trend` → 200; directional summary; `cached: false` always
+- [x] **D9-2.5** `GET /summary?city=Tokyo&mode=anomaly` → 200; outlier-focused summary; `cached: false` always
+- [x] **D9-2.6** `GET /summary?city=Tokyo&length=detailed&mode=trend` → 200; long trend-focused summary; `cached: false`
+- [x] **D9-2.7** `GET /summary?city=Tokyo&length=bad` → 400 `{"error":"Invalid value for length: bad"}`
+- [x] **D9-2.8** `GET /summary?city=Tokyo&mode=bad` → 400 `{"error":"Invalid value for mode: bad"}`
+- [x] **D9-2.9** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200, `GET /summary?city=Tokyo` → 200 with cache
+
+## Future Tasks (not scheduled)
+
+- [ ] **D9-Future-1** Cache per `(city, length, mode)` composite key to serve repeated non-default requests from cache
+- [ ] **D9-Future-2** Stream the Claude response back to the caller for lower time-to-first-byte
+- [ ] **D9-Future-3** Increase `max_tokens` for `length=detailed` to avoid mid-sentence truncation (currently capped at 200)
