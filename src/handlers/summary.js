@@ -2,6 +2,7 @@ const https = require('https');
 const locationCache = require('../cache/location');
 const weatherHistory = require('../cache/weather');
 const summaryCache = require('../cache/summary');
+const { decode } = require('../utils/weathercodes');
 
 const TTL_MS = (parseInt(process.env.SUMMARY_CACHE_TTL_MIN) || 60) * 60 * 1000;
 
@@ -78,10 +79,11 @@ async function summaryHandler(req, res) {
 
   const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
   const city   = searchParams.get('city');
-  const from   = searchParams.get('from') || undefined;
-  const to     = searchParams.get('to')   || undefined;
-  const length = searchParams.get('length') || 'normal';
-  const mode   = searchParams.get('mode')   || undefined;
+  const from    = searchParams.get('from')    || undefined;
+  const to      = searchParams.get('to')      || undefined;
+  const length  = searchParams.get('length')  || 'normal';
+  const mode    = searchParams.get('mode')    || undefined;
+  const refresh = searchParams.get('refresh') === 'true';
 
   if (!city) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -114,7 +116,7 @@ async function summaryHandler(req, res) {
 
   const isFiltered   = from || to;
   const isCustomized = length !== 'normal' || !!mode;
-  const skipCache    = isFiltered || isCustomized;
+  const skipCache    = isFiltered || isCustomized || refresh;
 
   const latestRecordTime = weatherHistory.getLatestTime(city);
 
@@ -131,7 +133,7 @@ async function summaryHandler(req, res) {
   }
 
   const context = history
-    .map(r => `${r.time} — temp: ${r.temperature}°C, wind: ${r.windspeed} km/h, code: ${r.weathercode}`)
+    .map(r => `${r.time} — temp: ${r.temperature}°C, wind: ${r.windspeed} km/h, conditions: ${decode(r.weathercode)}`)
     .join('\n');
 
   const systemPrompt = buildSystemPrompt(length, mode);

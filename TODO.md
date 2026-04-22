@@ -207,7 +207,7 @@ Reference: [log/day08.md](./log/day08.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D8-Future-1** Decode weathercodes into human-readable labels before sending to Claude (noted during Day 09 design — raw codes limit quality of `mode=anomaly` output)
+- [x] **D8-Future-1** Decode weathercodes into human-readable labels before sending to Claude → implemented in Day 10
 - [ ] **D8-Future-2** Stream the Claude response back to the caller for lower time-to-first-byte
 
 ---
@@ -237,3 +237,27 @@ Reference: [log/day09.md](./log/day09.md)
 - [ ] **D9-Future-1** Cache per `(city, length, mode)` composite key to serve repeated non-default requests from cache
 - [ ] **D9-Future-2** Stream the Claude response back to the caller for lower time-to-first-byte
 - [ ] **D9-Future-3** Increase `max_tokens` for `length=detailed` to avoid mid-sentence truncation (currently capped at 200)
+
+---
+
+# TODO - Day 10: Weathercode Decoding
+
+Reference: [log/day10.md](./log/day10.md)
+
+## Phase 1: Implementation
+
+- [x] **D10-1.1** Create `src/utils/weathercodes.js` — WMO code enum and `decode(code)` function
+- [x] **D10-1.2** Update `src/handlers/summary.js` — replace `code: ${r.weathercode}` with `conditions: ${decode(r.weathercode)}` in context string
+- [x] **D10-1.3** Add `?refresh=true` parameter to `GET /summary` — forces cache bypass without requiring non-default length/mode
+
+## Phase 2: Verification
+
+- [x] **D10-2.1** `GET /summary?city=Tokyo` → 200; summary references conditions by name (e.g. "Moderate rain"), not raw codes
+- [~] **D10-2.2** `GET /summary?city=Tokyo&mode=anomaly` → 200; outlier detection more precise with decoded labels (skipped)
+- [~] **D10-2.3** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200 (skipped)
+
+## Future Tasks (not scheduled)
+
+- [ ] **D10-Future-1** Cache per `(city, length, mode)` composite key (D9-Future-1)
+- [ ] **D10-Future-2** Stream the Claude response back to the caller (D9-Future-2)
+- [ ] **D10-Future-3** Increase `max_tokens` for `length=detailed` (D9-Future-3)

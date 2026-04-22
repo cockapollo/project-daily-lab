@@ -536,3 +536,53 @@ GET /summary?city=Tokyo&mode=bad                     # 400 Invalid value for mod
 ## Status
 
 Complete. All Day 09 acceptance criteria verified.
+
+---
+
+# Development Log - Day 10: Weathercode Decoding
+
+**Date:** 2026-04-22
+
+## Session Summary
+
+Decoded WMO weathercodes into human-readable labels before sending weather history to Claude. Previously, the context string included raw integers (`code: 63`), which required Claude to silently infer meaning from training data — contradicting the system prompt's instruction to use only provided data. This was especially limiting for `mode=anomaly`, where outlier detection depends on understanding what conditions codes represent.
+
+## Steps Performed
+
+### 1. Created Specification (`log/day10.md`)
+
+### 2. Implementation
+
+- **`src/utils/weathercodes.js`** — new module; WMO code enum covering all standard codes (0–99); `decode(code)` returns the label or `"Unknown (code: N)"` for unmapped values
+- **`src/handlers/summary.js`** — imported `decode`; replaced `code: ${r.weathercode}` with `conditions: ${decode(r.weathercode)}` in the context string; added `?refresh=true` parameter to force cache bypass without needing a non-default `length` or `mode`
+
+### 3. Updated Task List and Devlog
+
+- Marked D8-Future-1 complete in `TODO.md`
+- Added Day 10 section to `TODO.md` and `DEVLOG.md`
+
+## Files Created / Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day10.md` | Created | Weathercode decoding specification |
+| `src/utils/weathercodes.js` | Created | WMO code enum + `decode()` function |
+| `src/handlers/summary.js` | Updated | Use `decode(r.weathercode)` in context string |
+| `TODO.md` | Updated | D8-Future-1 marked complete; Day 10 tasks added |
+| `DEVLOG.md` | Updated | Added Day 10 session log |
+
+## Before / After
+
+Before:
+```
+2026-03-05T12:00 — temp: 8.8°C, wind: 2 km/h, code: 63
+```
+
+After:
+```
+2026-03-05T12:00 — temp: 8.8°C, wind: 2 km/h, conditions: Moderate rain
+```
+
+## Status
+
+Implementation complete. Pending verification.
