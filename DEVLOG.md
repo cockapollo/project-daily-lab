@@ -586,3 +586,62 @@ After:
 ## Status
 
 Implementation complete. Pending verification.
+
+---
+
+# Development Log - Day 11: Tiered max_tokens + Prompt Caching
+
+**Date:** 2026-04-24
+
+## Session Summary
+
+Two focused improvements to `callClaude` in `src/handlers/summary.js`:
+
+1. **Tiered `max_tokens`** — replaced the global `max_tokens: 200` with a per-length map: `brief` → 80, `normal` → 200, `detailed` → 450. This fixes the active truncation bug for `length=detailed` (4–6 sentences need more than 200 tokens) while giving `brief` a tighter ceiling.
+
+2. **Prompt caching** — converted the `system` field from a plain string to a content array with `cache_control: { type: "ephemeral" }`. Prompt caching is GA; no beta header required. Cache reads cost ~10% of normal input token price.
+
+## Implementation
+
+- **`MAX_TOKENS`** map added alongside the existing `VALID_LENGTHS` / `VALID_MODES` / `LENGTH_INSTRUCTIONS` constants.
+- **`callClaude(systemPrompt, prompt, length)`** — added `length` param; uses `MAX_TOKENS[length]`; system is now `[{ type, text, cache_control }]`.
+- Call site updated: `callClaude(systemPrompt, prompt, length)`.
+
+## Caching effective range
+
+Haiku 4.5 requires ≥ 4096 tokens in the cached prefix for caching to activate (below that the `cache_control` marker is silently ignored — no error, `cache_creation_input_tokens: 0`). The system prompt alone is ~50 tokens. Caching becomes effective automatically once a city's history grows large enough to push the total prompt past 4096 tokens. No further code changes needed.
+
+## Changes
+
+| Type | What | Detail |
+|------|------|--------|
+| Added | `MAX_TOKENS` constant | Per-length output caps: `brief` 80, `normal` 200, `detailed` 450 |
+| Changed | `callClaude` signature | Added `length` param; uses `MAX_TOKENS[length]` instead of hardcoded 200 |
+| Changed | `system` field format | Plain string → content array with `cache_control: { type: "ephemeral" }` |
+| Added | `detail` field on 502 responses | Surfaces the actual API error message instead of generic failure |
+| Removed | `anthropic-beta: prompt-caching-2024-07-31` header | Initially added; caused API rejection. Prompt caching is GA — no beta header needed |
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day11.md` | Created | Day 11 specification |
+| `TODO.md` | Updated | D10-Future-3 marked complete; Day 11 tasks added |
+| `DEVLOG.md` | Updated | Added Day 11 session log |
+| `src/handlers/summary.js` | Updated | `MAX_TOKENS` map; `callClaude` signature + body; error handling |
+
+## Verification Results
+
+```
+D11-2.1: GET /summary?city=Tokyo&length=detailed → 200; full paragraph, no truncation
+D11-2.2: GET /summary?city=Tokyo&length=brief    → 200; single (long) sentence
+D11-2.3: GET /summary?city=Tokyo                 → 200; cached: true on repeat calls
+D11-2.4: GET /hello → 200 hello world!  (regression pass)
+         GET /weather?city=Tokyo → 200  (regression pass)
+```
+
+**Debugging note:** Initial calls returned `{"error":"Failed to generate summary","detail":"Invalid value \"undefined\" for header \"x-api-key\""}` — `ANTHROPIC_API_KEY` was not set in the server process environment. Improved error handling surfaced this immediately instead of hiding it behind the generic 502 message. Also removed the stale `anthropic-beta: prompt-caching-2024-07-31` header (prompt caching is now GA; the header caused the API to reject the request).
+
+## Status
+
+Complete. All Day 11 acceptance criteria verified.

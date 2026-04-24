@@ -9,6 +9,12 @@ const TTL_MS = (parseInt(process.env.SUMMARY_CACHE_TTL_MIN) || 60) * 60 * 1000;
 const VALID_LENGTHS = ['brief', 'normal', 'detailed'];
 const VALID_MODES   = ['trend', 'anomaly'];
 
+const MAX_TOKENS = {
+  brief:    80,
+  normal:   200,
+  detailed: 450,
+};
+
 const LENGTH_INSTRUCTIONS = {
   brief:    'Respond in exactly 1 sentence.',
   normal:   'Respond in 2-3 sentences.',
@@ -29,11 +35,13 @@ function buildSystemPrompt(length, mode) {
   return parts.join(' ');
 }
 
-function callClaude(systemPrompt, prompt) {
+function callClaude(systemPrompt, prompt, length) {
   const body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 200,
-    system: systemPrompt,
+    max_tokens: MAX_TOKENS[length],
+    system: [
+      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+    ],
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -57,9 +65,13 @@ function callClaude(systemPrompt, prompt) {
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);
-            resolve(parsed.content[0].text);
+            if (parsed.type === 'error') {
+              reject(new Error(`Claude API error: ${parsed.error.type} — ${parsed.error.message}`));
+            } else {
+              resolve(parsed.content[0].text);
+            }
           } catch (e) {
-            reject(new Error('Invalid response from Claude API'));
+            reject(new Error(`Invalid response from Claude API: ${data.slice(0, 200)}`));
           }
         });
       }
@@ -140,7 +152,7 @@ async function summaryHandler(req, res) {
   const prompt = `City: ${displayName}. Weather history (oldest to newest):\n${context}\n\nSummarize the weather trend.`;
 
   try {
-    const summary = await callClaude(systemPrompt, prompt);
+    const summary = await callClaude(systemPrompt, prompt, length);
     if (!skipCache) {
       summaryCache.set(displayName, summary, latestRecordTime);
     }
@@ -148,7 +160,7 @@ async function summaryHandler(req, res) {
     res.end(JSON.stringify({ city: displayName, record_count: history.length, summary, cached: false }));
   } catch (err) {
     res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to generate summary' }));
+    res.end(JSON.stringify({ error: 'Failed to generate summary', detail: err.message }));
   }
 }
 

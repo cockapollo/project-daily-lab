@@ -260,4 +260,29 @@ Reference: [log/day10.md](./log/day10.md)
 
 - [ ] **D10-Future-1** Cache per `(city, length, mode)` composite key (D9-Future-1)
 - [ ] **D10-Future-2** Stream the Claude response back to the caller (D9-Future-2)
-- [ ] **D10-Future-3** Increase `max_tokens` for `length=detailed` (D9-Future-3)
+- [x] **D10-Future-3** Increase `max_tokens` for `length=detailed` → implemented in Day 11
+
+---
+
+# TODO - Day 11: Tiered max_tokens + Prompt Caching
+
+Reference: [log/day11.md](./log/day11.md)
+
+## Phase 1: Implementation
+
+- [x] **D11-1.1** Add `MAX_TOKENS` map (`brief`: 80, `normal`: 200, `detailed`: 450) to `src/handlers/summary.js`
+- [x] **D11-1.2** Update `callClaude` to accept `length` param and use `MAX_TOKENS[length]`
+- [x] **D11-1.3** Convert `system` field to content array with `cache_control: { type: "ephemeral" }`
+- [x] **D11-1.4** Add `anthropic-beta: prompt-caching-2024-07-31` header
+
+## Phase 2: Verification
+
+- [x] **D11-2.1** `GET /summary?city=Tokyo&length=detailed` → 200; full paragraph response; no mid-sentence truncation
+- [x] **D11-2.2** `GET /summary?city=Tokyo&length=brief` → 200; single sentence
+- [x] **D11-2.3** `GET /summary?city=Tokyo` → 200; 2–3 sentence response; cache still active
+- [x] **D11-2.4** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200
+
+## Future Tasks (not scheduled)
+
+- [ ] **D11-Future-1** Cache per `(city, length, mode)` composite key (D10-Future-1)
+- [ ] **D11-Future-2** Stream the Claude response back to the caller (D10-Future-2)
