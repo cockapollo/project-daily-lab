@@ -589,6 +589,66 @@ Implementation complete. Pending verification.
 
 ---
 
+# Development Log - Day 12: Composite Summary Cache Key
+
+**Date:** 2026-04-29
+
+## Session Summary
+
+Extended the `summary_cache` to store one row per `(city, length, mode)` combination instead of one row per city. Previously, any non-default `length` or `mode` bypassed the cache entirely (`isCustomized = true → skipCache = true`), meaning repeated `brief` or `trend` requests always called the Claude API. Now all combinations are cached independently.
+
+## Why `city TEXT PRIMARY KEY` was wrong
+
+The original `summary_cache` table used `city` as the sole primary key — one row per city. This made the cache key independent of `length` and `mode`. The consequence: if caching were allowed for non-default params, a `brief` summary and a `normal` summary for Tokyo would collide on the same row. Whichever was written last would overwrite the other, and the next read could return a one-sentence `brief` summary in response to a `normal` request, or vice versa — silently wrong output.
+
+Day 9 worked around this by setting `isCustomized = length !== 'normal' || !!mode` and adding it to `skipCache`. Any non-default combination simply bypassed the cache entirely, avoiding the collision at the cost of always calling the Claude API. That was correct but wasteful: every repeated `brief` or `trend` request paid a full API round-trip even when the underlying data hadn't changed.
+
+The fix is a composite primary key `(city, length, mode)` — each combination gets its own row with no possibility of collision, and the cache bypass for non-default params is no longer needed.
+
+## Implementation
+
+### `src/cache/summary.js`
+- Schema changed from `city TEXT PRIMARY KEY` to `PRIMARY KEY (city, length, mode)`
+- `mode` stored as `''` for the no-mode case (SQLite allows NULL in a composite PK for regular rowid tables, but an empty string is unambiguous and simpler to query)
+- Added schema migration: reads `PRAGMA table_info(summary_cache)` on startup; if the `length` column is absent (old schema), drops the table before recreating — cache data is expendable
+- `get(city, length, mode)` and `set(city, length, mode, summary, basedOnRecordTime)` updated accordingly
+
+### `src/handlers/summary.js`
+- Removed `isCustomized` variable and its contribution to `skipCache`
+- `skipCache` is now `isFiltered || refresh` only — date-range filters and `?refresh=true` still bypass cache; `length`/`mode` no longer do
+- `summaryCache.get` and `summaryCache.set` calls updated to pass `length` and `mode || ''`
+
+## Invalidation behaviour
+
+Each `(city, length, mode)` combo checks its own `cached_at` (TTL) and `based_on_record_time` independently. Since `latestRecordTime` is always the DB-wide MAX for the city, new weather data will eventually invalidate all combos for that city once their TTL expires.
+
+## Verification Results
+
+```
+D12-2.1: GET /summary?city=Tokyo (x2)                         → cached: false, cached: true
+D12-2.2: GET /summary?city=Tokyo&length=brief (x2)            → cached: false, cached: true
+D12-2.3: GET /summary?city=Tokyo&mode=trend (x2)              → cached: false, cached: true
+D12-2.4: GET /summary?city=Tokyo&length=detailed&mode=trend   → cached: false, cached: true
+D12-2.5: GET /summary?city=Tokyo&from=2026-01-01 (x2)         → cached: false, cached: false
+D12-2.6: DB rows: tokyo/brief/, tokyo/detailed/trend, tokyo/normal/, tokyo/normal/trend
+```
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day12.md` | Created | Day 12 specification |
+| `TODO.md` | Updated | D11-Future-1 marked complete; Day 12 tasks added |
+| `DEVLOG.md` | Updated | Added Day 12 session log |
+| `src/cache/summary.js` | Updated | Composite PK; migration; updated get/set signatures |
+| `src/handlers/summary.js` | Updated | Removed isCustomized; updated cache calls |
+
+## Status
+
+Complete. All Day 12 acceptance criteria verified.
+
+---
+
 # Development Log - Day 11: Tiered max_tokens + Prompt Caching
 
 **Date:** 2026-04-24

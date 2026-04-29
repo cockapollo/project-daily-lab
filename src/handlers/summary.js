@@ -126,14 +126,13 @@ async function summaryHandler(req, res) {
   const location = locationCache.get(city);
   const displayName = location ? location.name : city;
 
-  const isFiltered   = from || to;
-  const isCustomized = length !== 'normal' || !!mode;
-  const skipCache    = isFiltered || isCustomized || refresh;
+  const isFiltered = from || to;
+  const skipCache  = isFiltered || refresh;
 
   const latestRecordTime = weatherHistory.getLatestTime(city);
 
   if (!skipCache) {
-    const cached = summaryCache.get(displayName);
+    const cached = summaryCache.get(displayName, length, mode || '');
     if (cached) {
       const age = Date.now() - cached.cached_at;
       if (age < TTL_MS || cached.based_on_record_time === latestRecordTime) {
@@ -154,7 +153,7 @@ async function summaryHandler(req, res) {
   try {
     const summary = await callClaude(systemPrompt, prompt, length);
     if (!skipCache) {
-      summaryCache.set(displayName, summary, latestRecordTime);
+      summaryCache.set(displayName, length, mode || '', summary, latestRecordTime);
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ city: displayName, record_count: history.length, summary, cached: false }));

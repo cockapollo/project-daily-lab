@@ -284,5 +284,29 @@ Reference: [log/day11.md](./log/day11.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D11-Future-1** Cache per `(city, length, mode)` composite key (D10-Future-1)
+- [x] **D11-Future-1** Cache per `(city, length, mode)` composite key → implemented in Day 12
 - [ ] **D11-Future-2** Stream the Claude response back to the caller (D10-Future-2)
+
+---
+
+# TODO - Day 12: Composite Summary Cache Key
+
+Reference: [log/day12.md](./log/day12.md)
+
+## Phase 1: Implementation
+
+- [x] **D12-1.1** Update `src/cache/summary.js` — change `PRIMARY KEY` from `city` to `(city, length, mode)`; add schema migration via `PRAGMA table_info`; update `get`/`set` signatures
+- [x] **D12-1.2** Update `src/handlers/summary.js` — remove `isCustomized` from `skipCache`; pass `length` and `mode` to cache `get`/`set`
+
+## Phase 2: Verification
+
+- [x] **D12-2.1** Default (`normal`, no mode) — first call `cached: false`, second `cached: true`
+- [x] **D12-2.2** `length=brief` — first `cached: false`, second `cached: true` (was always false before)
+- [x] **D12-2.3** `mode=trend` — first `cached: false`, second `cached: true` (was always false before)
+- [x] **D12-2.4** `length=detailed&mode=trend` — first `cached: false`, second `cached: true`
+- [x] **D12-2.5** `?from` filter — always `cached: false` (unchanged)
+- [x] **D12-2.6** DB confirms separate rows per `(city, length, mode)` combo
+
+## Future Tasks (not scheduled)
+
+- [ ] **D12-Future-1** Stream the Claude response back to the caller
