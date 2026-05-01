@@ -35,6 +35,81 @@ function buildSystemPrompt(length, mode) {
   return parts.join(' ');
 }
 
+function callClaudeStream(systemPrompt, prompt, length, onDelta) {
+  const body = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: MAX_TOKENS[length],
+    stream: true,
+    system: [
+      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+    ],
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'api.anthropic.com',
+        path: '/v1/messages',
+        method: 'POST',
+        family: 4,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          let errBody = '';
+          res.on('data', (c) => { errBody += c; });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(errBody);
+              reject(new Error(`Claude API error: ${parsed.error?.type} — ${parsed.error?.message}`));
+            } catch (_) {
+              reject(new Error(`Claude API HTTP ${res.statusCode}`));
+            }
+          });
+          return;
+        }
+
+        let fullText = '';
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6);
+            try {
+              const event = JSON.parse(raw);
+              if (event.type === 'error') {
+                reject(new Error(`Claude API error: ${event.error.type} — ${event.error.message}`));
+                return;
+              }
+              if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                fullText += event.delta.text;
+                onDelta(event.delta.text);
+              }
+            } catch (_) { /* skip unparseable SSE lines */ }
+          }
+        });
+
+        res.on('end', () => resolve(fullText));
+        res.on('error', reject);
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function callClaude(systemPrompt, prompt, length) {
   const body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
@@ -96,6 +171,7 @@ async function summaryHandler(req, res) {
   const length  = searchParams.get('length')  || 'normal';
   const mode    = searchParams.get('mode')    || undefined;
   const refresh = searchParams.get('refresh') === 'true';
+  const stream  = searchParams.get('stream')  === 'true';
 
   if (!city) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -136,8 +212,16 @@ async function summaryHandler(req, res) {
     if (cached) {
       const age = Date.now() - cached.cached_at;
       if (age < TTL_MS || cached.based_on_record_time === latestRecordTime) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ city: displayName, record_count: history.length, summary: cached.summary, cached: true }));
+        if (stream) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+          res.write(`data: ${JSON.stringify({ type: 'meta', city: displayName, record_count: history.length })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'delta', text: cached.summary })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'done', cached: true })}\n\n`);
+          res.end();
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ city: displayName, record_count: history.length, summary: cached.summary, cached: true }));
+        }
         return;
       }
     }
@@ -150,16 +234,34 @@ async function summaryHandler(req, res) {
   const systemPrompt = buildSystemPrompt(length, mode);
   const prompt = `City: ${displayName}. Weather history (oldest to newest):\n${context}\n\nSummarize the weather trend.`;
 
-  try {
-    const summary = await callClaude(systemPrompt, prompt, length);
-    if (!skipCache) {
-      summaryCache.set(displayName, length, mode || '', summary, latestRecordTime);
+  if (stream) {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+    res.write(`data: ${JSON.stringify({ type: 'meta', city: displayName, record_count: history.length })}\n\n`);
+    try {
+      const summary = await callClaudeStream(systemPrompt, prompt, length, (text) => {
+        res.write(`data: ${JSON.stringify({ type: 'delta', text })}\n\n`);
+      });
+      if (!skipCache) {
+        summaryCache.set(displayName, length, mode || '', summary, latestRecordTime);
+      }
+      res.write(`data: ${JSON.stringify({ type: 'done', cached: false })}\n\n`);
+      res.end();
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      res.end();
     }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ city: displayName, record_count: history.length, summary, cached: false }));
-  } catch (err) {
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to generate summary', detail: err.message }));
+  } else {
+    try {
+      const summary = await callClaude(systemPrompt, prompt, length);
+      if (!skipCache) {
+        summaryCache.set(displayName, length, mode || '', summary, latestRecordTime);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ city: displayName, record_count: history.length, summary, cached: false }));
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to generate summary', detail: err.message }));
+    }
   }
 }
 

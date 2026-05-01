@@ -1,3 +1,62 @@
+# Development Log - Day 13: Streaming Claude Response
+
+**Date:** 2026-05-02
+
+## Session Summary
+
+Added opt-in streaming to `GET /summary` via `?stream=true`. When set, the endpoint responds with `Content-Type: text/event-stream` (SSE) and emits three event types: `meta` (city + record count), `delta` (text chunks as Claude generates them), and `done` (cached flag). Cache hits also use SSE format for a consistent client API — the full cached summary arrives as a single `delta`. The existing non-streaming path is unchanged.
+
+## Steps Performed
+
+### 1. Added `callClaudeStream` to `src/handlers/summary.js`
+
+- Mirrors `callClaude` but sets `stream: true` in the request body
+- Buffers incoming SSE chunks line-by-line; extracts `content_block_delta` text deltas and calls `onDelta(text)` for each
+- Resolves with the full assembled text (for caching) once the response ends
+- Added HTTP status code guard: non-200 responses (e.g. auth errors) parse the plain JSON error body and reject with a clear message, instead of silently resolving with empty text
+
+### 2. Added `?stream=true` query param to `summaryHandler`
+
+- Cache miss path: writes SSE headers, emits `meta`, calls `callClaudeStream` piping deltas to the client, writes to cache on completion, emits `done`
+- Cache hit path: writes SSE headers, emits `meta` + full summary as one `delta` + `done`
+- Error path: emits `{ type: "error", message }` SSE event
+- Non-stream path: unchanged
+
+## SSE Event Format
+
+```
+data: {"type":"meta","city":"Tokyo","record_count":5}
+
+data: {"type":"delta","text":"Based on the records, Tokyo's weather..."}
+
+data: {"type":"done","cached":false}
+```
+
+## Verification Results
+
+```
+D13-2.1: GET /summary?city=Tokyo&stream=true (cache miss)  → meta + 5 delta chunks + done cached:false
+D13-2.2: GET /summary?city=Tokyo&stream=true (cache hit)   → meta + 1 delta (full summary) + done cached:true
+D13-2.3: GET /summary?city=Tokyo                           → unchanged JSON {"city":...,"cached":true}
+D13-2.4: GET /hello → 200 hello world!  (regression pass)
+         GET /weather?city=Tokyo → 200  (regression pass)
+```
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `log/day13.md` | — | (spec not written; implemented directly) |
+| `TODO.md` | Updated | D12-Future-1 marked complete; Day 13 tasks added and verified |
+| `DEVLOG.md` | Updated | Added Day 13 session log |
+| `src/handlers/summary.js` | Updated | `callClaudeStream` + `?stream=true` support + HTTP status guard |
+
+## Status
+
+Complete. All Day 13 acceptance criteria verified.
+
+---
+
 # Development Log - Day 01: Hello World API Service
 
 **Date:** 2026-02-20

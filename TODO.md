@@ -309,4 +309,22 @@ Reference: [log/day12.md](./log/day12.md)
 
 ## Future Tasks (not scheduled)
 
-- [ ] **D12-Future-1** Stream the Claude response back to the caller
+- [x] **D12-Future-1** Stream the Claude response back to the caller → implemented in Day 13
+
+---
+
+# TODO - Day 13: Streaming Claude Response
+
+Reference: [log/day13.md](./log/day13.md)
+
+## Phase 1: Implementation
+
+- [x] **D13-1.1** Add `callClaudeStream(systemPrompt, prompt, length, onDelta)` to `src/handlers/summary.js` — sends `stream: true` to Claude API, parses SSE line-by-line, calls `onDelta` on each `content_block_delta`, resolves with full assembled text
+- [x] **D13-1.2** Add `?stream=true` query param to `GET /summary` — when set, responds with `Content-Type: text/event-stream`; sends `meta`, `delta`, and `done` SSE events; cache hit also uses SSE format for consistency
+
+## Phase 2: Verification
+
+- [x] **D13-2.1** `GET /summary?city=Tokyo&stream=true` (cache miss) → SSE stream with `meta`, multiple `delta` events, then `done` with `"cached":false`
+- [x] **D13-2.2** `GET /summary?city=Tokyo&stream=true` (cache hit) → SSE stream with `meta`, one `delta` (full summary), then `done` with `"cached":true`
+- [x] **D13-2.3** `GET /summary?city=Tokyo` (no `stream`) → unchanged JSON response
+- [x] **D13-2.4** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200
