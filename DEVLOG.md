@@ -1,3 +1,51 @@
+# Development Log - Day 15: Nominatim Geocoding (Japanese Support)
+
+**Date:** 2026-05-06
+
+## Session Summary
+
+Replaced Open-Meteo's Geocoding API with Nominatim (OpenStreetMap) to support Japanese city, town, and station names. Open-Meteo only accepts Latin characters; Nominatim handles Kanji and Katakana, including hyper-local names like 吉祥寺 and 下連雀. The forecast API (Open-Meteo) remains unchanged — only the geocoding step was swapped.
+
+## Implementation
+
+### `src/handlers/weather.js`
+
+- `fetchJson(url, headers = {})` — added optional `headers` param; Nominatim requires `User-Agent` per its usage policy
+- `fetchWeatherForCity` geocoding block:
+  - New URL: `https://nominatim.openstreetmap.org/search?q={city}&format=json&limit=1`
+  - Added `User-Agent: ai-helloworld/1.0` header
+  - Nominatim returns an array (not `{ results: [] }`); check `Array.isArray && length > 0`
+  - `lat` / `lon` come as strings — `parseFloat` both
+  - City display name: `display_name.split(',')[0].trim()` — takes the most specific segment
+
+## Notes
+
+- **Client must percent-encode Japanese characters** — Node.js's HTTP parser (llhttp) rejects raw Unicode in URLs per RFC; `curl -s "...?city=吉祥寺"` returns 400 from Node before reaching the handler. Use `%E5%90%89%E7%A5%A5%E5%AF%BA` etc.
+- ロンドン → "Greater London" (Nominatim's first display_name segment for London)
+- Nominatim usage policy: 1 req/s max, User-Agent required — our max-3 cap and parallel-per-request model stays within policy
+
+## Verification Results
+
+```
+D15-2.1: GET /weather?city=%E5%90%89%E7%A5%A5%E5%AF%BA  → 200 {"city":"吉祥寺","latitude":35.7031413,"longitude":139.5803077,"temperature":18.2°C}
+D15-2.2: GET /weather?cities=吉祥寺,下連雀,ロンドン       → 200 { results: [吉祥寺 18.2°C, 下連雀 18.2°C, Greater London 10.2°C], errors: [] }
+D15-2.3: GET /weather?city=Tokyo                         → 200 (cache hit, regression pass)
+```
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `TODO.md` | Updated | Day 15 tasks added and verified |
+| `DEVLOG.md` | Updated | Added Day 15 session log |
+| `src/handlers/weather.js` | Updated | Nominatim geocoding; `fetchJson` headers param |
+
+## Status
+
+Complete. All Day 15 acceptance criteria verified.
+
+---
+
 # Development Log - Day 14: Multi-City Weather Batch
 
 **Date:** 2026-05-06

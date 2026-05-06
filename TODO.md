@@ -345,3 +345,23 @@ Reference: [log/day13.md](./log/day13.md)
 - [x] **D14-2.3** `GET /weather?cities=A,B,C,D` → 400 `{ error: "Too many cities: max 3" }`
 - [x] **D14-2.4** `GET /weather?cities=` → 400 (empty string treated same as missing param — acceptable)
 - [x] **D14-2.5** Regression: `GET /weather?city=Tokyo` → 200 single JSON (unchanged), `GET /hello` → 200
+
+---
+
+# TODO - Day 15: Nominatim Geocoding (Japanese Support)
+
+## Phase 1: Implementation
+
+- [x] **D15-1.1** Extend `fetchJson(url, headers)` with optional headers param — needed for Nominatim's required `User-Agent`
+- [x] **D15-1.2** Replace Open-Meteo Geocoding with Nominatim in `fetchWeatherForCity` — parse array response, `parseFloat` lat/lon, use first segment of `display_name` as city name
+
+## Phase 2: Verification
+
+- [x] **D15-2.1** `GET /weather?city=吉祥寺` (percent-encoded) → 200 with Japanese city name and correct coordinates
+- [x] **D15-2.2** `GET /weather?cities=吉祥寺,下連雀,ロンドン` (percent-encoded) → 200 with all 3 resolved
+- [x] **D15-2.3** Regression: `GET /weather?city=Tokyo` → 200 (cache hit, unchanged)
+
+## Notes
+
+- Raw Unicode in URLs is rejected by Node.js's HTTP parser (RFC-compliant) — clients must percent-encode Japanese characters
+- ロンドン resolves to "Greater London" via Nominatim's display_name

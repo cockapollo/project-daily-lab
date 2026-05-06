@@ -2,7 +2,7 @@ const https = require('https');
 const locationCache = require('../cache/location');
 const weatherHistory = require('../cache/weather');
 
-function fetchJson(url) {
+function fetchJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const options = {
@@ -10,6 +10,7 @@ function fetchJson(url) {
       path: parsed.pathname + parsed.search,
       method: 'GET',
       family: 4, // force IPv4 — IPv6 for open-meteo times out on this host
+      headers,
     };
     https.request(options, (res) => {
       let data = '';
@@ -34,14 +35,17 @@ async function fetchWeatherForCity(city) {
   if (cached) {
     ({ latitude, longitude, name } = cached);
   } else {
-    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-    const geoData = await fetchJson(geoUrl);
+    const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+    const geoData = await fetchJson(geoUrl, { 'User-Agent': 'ai-helloworld/1.0' });
 
-    if (!geoData.results || geoData.results.length === 0) {
+    if (!Array.isArray(geoData) || geoData.length === 0) {
       throw Object.assign(new Error(`City not found: ${city}`), { status: 404 });
     }
 
-    ({ latitude, longitude, name } = geoData.results[0]);
+    const geo = geoData[0];
+    latitude  = parseFloat(geo.lat);
+    longitude = parseFloat(geo.lon);
+    name      = geo.display_name.split(',')[0].trim();
     locationCache.set(city, { name, latitude, longitude });
   }
 
