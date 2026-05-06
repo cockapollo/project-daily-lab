@@ -1,3 +1,53 @@
+# Development Log - Day 14: Multi-City Weather Batch
+
+**Date:** 2026-05-06
+
+## Session Summary
+
+Added `?cities=` batch parameter to `GET /weather`, accepting up to 3 comma-separated city names. All cities are fetched in parallel via `Promise.allSettled` — partial success is supported, returning `{ results, errors }`. The existing `?city=` single-city path is unchanged.
+
+## Implementation
+
+### `src/handlers/weather.js`
+
+- Extracted single-city logic from `weatherHandler` into `fetchWeatherForCity(city)` — handles geocoding cache lookup, Geocoding API call, Forecast API call, and `weather_history` write; throws with `status: 404` for unknown cities
+- Added `MAX_CITIES = 3` constant
+- `weatherHandler` now branches on `?city` vs `?cities`:
+  - `?city`: calls `fetchWeatherForCity` directly, maps `status` property to 404 or 502
+  - `?cities`: splits on `,`, trims, validates count (≤3), runs `Promise.allSettled`, partitions into `results` / `errors`
+  - Neither param: 400
+
+## Design Decisions
+
+- **`Promise.allSettled` over `Promise.all`** — allows partial success; one bad city doesn't fail the batch
+- **Max 3** — caps Open-Meteo API load per request; agreed with user
+- **`?cities=` (empty)** — treated same as missing param (hits the `!city && !cities` guard); acceptable behaviour
+
+## Verification Results
+
+```
+D14-2.1: GET /weather?cities=Tokyo,Osaka,London             → 200 { results: [Tokyo 18.8°C, Osaka 18.9°C, London 9.6°C], errors: [] }
+D14-2.2: GET /weather?cities=Tokyo,Nonexistentplace12345    → 200 { results: [1], errors: [{city: 'Nonexistentplace12345', error: 'City not found: ...'}] }
+D14-2.3: GET /weather?cities=A,B,C,D                       → 400 {"error":"Too many cities: max 3"}
+D14-2.4: GET /weather?cities=                              → 400 (missing param guard)
+D14-2.5: GET /weather?city=Tokyo → 200 single JSON (regression pass)
+         GET /hello → 200 hello world! (regression pass)
+```
+
+## Files Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `TODO.md` | Updated | Day 14 tasks added and verified |
+| `DEVLOG.md` | Updated | Added Day 14 session log |
+| `src/handlers/weather.js` | Updated | `fetchWeatherForCity` helper + `?cities=` batch path |
+
+## Status
+
+Complete. All Day 14 acceptance criteria verified.
+
+---
+
 # Development Log - Day 13: Streaming Claude Response
 
 **Date:** 2026-05-02

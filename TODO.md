@@ -328,3 +328,20 @@ Reference: [log/day13.md](./log/day13.md)
 - [x] **D13-2.2** `GET /summary?city=Tokyo&stream=true` (cache hit) → SSE stream with `meta`, one `delta` (full summary), then `done` with `"cached":true`
 - [x] **D13-2.3** `GET /summary?city=Tokyo` (no `stream`) → unchanged JSON response
 - [x] **D13-2.4** Regression: `GET /hello` → 200, `GET /weather?city=Tokyo` → 200
+
+---
+
+# TODO - Day 14: Multi-City Weather Batch
+
+## Phase 1: Implementation
+
+- [x] **D14-1.1** Extract single-city logic from `weatherHandler` into `fetchWeatherForCity(city)` — returns result object or throws with `status` property for 404 vs 502
+- [x] **D14-1.2** Add `?cities=` param to `GET /weather` — comma-separated, max 3; runs `Promise.allSettled` in parallel; returns `{ results, errors }`
+
+## Phase 2: Verification
+
+- [x] **D14-2.1** `GET /weather?cities=Tokyo,Osaka,London` → 200 `{ results: [3 entries], errors: [] }`
+- [x] **D14-2.2** `GET /weather?cities=Tokyo,Nonexistentplace12345` → 200 `{ results: [1], errors: [1] }` (partial success)
+- [x] **D14-2.3** `GET /weather?cities=A,B,C,D` → 400 `{ error: "Too many cities: max 3" }`
+- [x] **D14-2.4** `GET /weather?cities=` → 400 (empty string treated same as missing param — acceptable)
+- [x] **D14-2.5** Regression: `GET /weather?city=Tokyo` → 200 single JSON (unchanged), `GET /hello` → 200
